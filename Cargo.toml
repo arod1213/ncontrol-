@@ -3,10 +3,22 @@ name = "ncontrol_plus"
 version = "0.1.0"
 edition = "2024"
 
+[[bin]]
+name = "ncontrol_plus"
+path = "src/main.rs"  # This is your GUI/mac app
+
+[[bin]]
+name = "ncontrol_plus_config"
+path = "src/config_cli.rs"  # This is your CLI tool
+
 [dependencies]
 midir = "0.9"
-tokio = { version = "1", features = ["full"] }
+# tokio = { version = "1", features = ["full"] }
 device_query = "1.1"
 cocoa = "0.25"
 objc = "0.2"
 core-graphics = "0.22"
+clap = { version = "4.5.32", features = ["derive"] }
+serde = { version = "1.0.219", features = ["derive"] }
+dirs = "6.0.0"
+serde_json = "1.0.140"

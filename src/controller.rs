@@ -1,61 +1,106 @@
-#[allow(unused_imports)]
-
-use std::sync::{Arc, Mutex};
+use crate::{
+    send_cc::{establish_connection, send_cc_msg},
+    settings::Config,
+};
+use device_query::{DeviceQuery, DeviceState, Keycode};
+use midir::MidiOutputConnection;
 use std::thread;
 use std::time::Duration;
-use crate::send_cc::{establish_connection, send_cc_msg};
-use device_query::{DeviceQuery, DeviceState, Keycode};
 
-pub fn launch() {
-    let mut conn = establish_connection().unwrap();
+struct KeyCommands {
+    mute: Keycode,
+    vol_up: Keycode,
+    vol_down: Keycode,
+}
 
-    let volume = Arc::new(Mutex::new(73));
-    let mute_pressed = Arc::new(Mutex::new(false));
+struct KeyPressInput<'a> {
+    val: &'a mut u8,
+    ccs: &'a Vec<u8>,
+    keys: &'a Vec<Keycode>,
+    conn: &'a mut MidiOutputConnection,
+    key_commands: &'a KeyCommands,
+}
 
-    let ccs = vec![16, 17];
+fn handle_key_press(input: KeyPressInput) {
+    let KeyPressInput {
+        mut val,
+        ccs,
+        keys,
+        mut conn,
+        key_commands,
+    } = input;
+
     let channel = 0;
 
+    if *val > 127 {
+        return;
+    }
+
+    match keys {
+        v if v.contains(&key_commands.vol_up) => {
+            println!("setting val to {:?}", val.saturating_add(2));
+            *val = (*val + 2).min(127);
+            for cc in ccs.iter() {
+                let _ = send_cc_msg(&mut conn, *cc, *val, channel);
+            }
+        }
+        v if v.contains(&key_commands.vol_down) => {
+            *val = val.saturating_sub(2);
+            for cc in ccs.iter() {
+                let _ = send_cc_msg(&mut conn, *cc, *val, channel);
+            }
+        }
+        v if v.contains(&key_commands.mute) => {
+            for cc in ccs.iter() {
+                let _ = send_cc_msg(&mut conn, *cc, 127, 1);
+            }
+        }
+        _ => (),
+    }
+}
+
+fn keys_are_commands(keys: &Vec<Keycode>, commands: &KeyCommands) -> bool {
+    keys.contains(&commands.mute)
+        || keys.contains(&commands.vol_down)
+        || keys.contains(&commands.vol_up)
+}
+
+pub fn launch(config: Config) {
+    let key_commands = KeyCommands {
+        mute: Keycode::F10,
+        vol_down: Keycode::F11,
+        vol_up: Keycode::F12,
+    };
+
+    let mut conn = establish_connection().unwrap();
     let device_state = DeviceState::new();
+
+    let mut val: u8 = 73;
+    let ccs = config.channels;
 
     loop {
         let keys = device_state.get_keys();
-        let command_pressed = keys.contains(&Keycode::Meta);
+        let input = KeyPressInput {
+            val: &mut val,
+            ccs: &ccs,
+            keys: &keys,
+            conn: &mut conn,
+            key_commands: &key_commands,
+        };
+        handle_key_press(input);
 
-        if command_pressed && keys.contains(&Keycode::F12) {
-            let mut val = volume.lock().unwrap();
-            if *val < 127 {
-                *val += 2;
-                for cc in &ccs {
-                    let _ = send_cc_msg(&mut conn, *cc, *val, channel);
-                }
+        {
+            if !keys.contains(&key_commands.mute) && keys_are_commands(&keys, &key_commands) {
+                println!("SHOULD SLEEP");
+                thread::sleep(Duration::from_millis(75));
+                continue;
             }
         }
 
-        if command_pressed && keys.contains(&Keycode::F11) {
-            let mut val = volume.lock().unwrap();
-            if *val < 127 {
-                *val -= 2;
-                for cc in &ccs {
-                    let _ = send_cc_msg(&mut conn, *cc, *val, channel);
-                }
-            }
+        while device_state.get_keys().contains(&key_commands.mute)
+            && keys.contains(&key_commands.mute)
+        {
+            ();
         }
-        if command_pressed && keys.contains(&Keycode::F10) {
-            let mut mute_pressed = mute_pressed.lock().unwrap();
-
-            if *mute_pressed {
-                continue
-            }
-
-            for cc in &ccs {
-                let _ = send_cc_msg(&mut conn, *cc, 127, 1);
-            }
-            *mute_pressed = true;
-        }
-        if !command_pressed || !keys.contains(&Keycode::F10) {
-            let mut mute_pressed = mute_pressed.lock().unwrap();
-            *mute_pressed = false;
-        }
-        thread::sleep(Duration::from_millis(75));
     }
 }

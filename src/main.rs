@@ -1,25 +1,28 @@
 mod controller;
 mod send_cc;
+mod settings;
+
+use controller::launch;
+use settings::{load_config, Config};
 
 extern crate cocoa;
 extern crate core_graphics;
 extern crate objc;
 
-use controller::launch;
 use cocoa::appkit::{
-    NSApp, NSApplication, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem, NSVariableStatusItemLength, NSButton,
+    NSApp, NSApplication, NSButton, NSMenu, NSMenuItem, NSStatusBar, NSStatusItem,
+    NSVariableStatusItemLength,
 };
 use cocoa::base::{nil, selector};
 use cocoa::foundation::{NSAutoreleasePool, NSString};
 
-fn main() {
+fn app_loop(config: Config) {
     unsafe {
         let _pool = NSAutoreleasePool::new(nil);
         let app = NSApp();
 
-        // 👇 Spawn the background controller logic
         std::thread::spawn(|| {
-            launch(); // your MIDI and keyboard logic lives here
+            launch(config);
         });
 
         // 🎛 Setup the menu bar icon
@@ -45,4 +48,9 @@ fn main() {
         // 🚀 Start the Cocoa app loop (blocks forever)
         app.run();
     }
+}
+
+fn main() {
+    let config = load_config();
+    app_loop(config);
 }
