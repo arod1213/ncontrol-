@@ -25,7 +25,6 @@ fn app_loop(config: Config) {
             launch(config);
         });
 
-        // 🎛 Setup the menu bar icon
         let status_bar = NSStatusBar::systemStatusBar(nil);
         let status_item = status_bar.statusItemWithLength_(NSVariableStatusItemLength);
 
@@ -45,7 +44,6 @@ fn app_loop(config: Config) {
 
         status_item.setMenu_(menu);
 
-        // 🚀 Start the Cocoa app loop (blocks forever)
         app.run();
     }
 }
