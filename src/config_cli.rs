@@ -13,7 +13,7 @@ pub struct Args {
 pub enum Command {
     Set {
         #[arg(
-            value_parser = clap::value_parser!(u8).range(0..=127),
+            value_parser = clap::value_parser!(u8).range(1..=128),
             required = true
         )]
         channels: Vec<u8>,
@@ -29,16 +29,21 @@ fn main() {
             let mut sorted = channels.clone();
             sorted.sort_unstable();
             sorted.dedup();
+            sorted = sorted.iter().map(|x| x.saturating_sub(1)).collect();
 
             let config = Config { channels: sorted };
-            let _ = save_config(&config);
-            println!("MIDI channels set to {:?}", config);
-            return;
+            match save_config(&config) {
+                Ok(_) => {
+                    println!("MIDI channels set to {:?}", config);
+                }
+                Err(e) => {
+                    eprintln!("error: {:?}", e);
+                }
+            };
         }
         Some(Command::Show) => {
             let config = load_config();
             println!("Current MIDI channels: {:?}", config);
-            return;
         }
         None => {
             println!("Use `set-channels` to configure MIDI channels. Try --help for options.");

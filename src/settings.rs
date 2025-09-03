@@ -21,11 +21,9 @@ impl Default for Config {
 }
 
 pub fn save_config(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    let home_dir = dirs::home_dir().expect("Could not find the home directory");
-
-    let mut dir_path = home_dir;
-    dir_path.push("Documents");
-    dir_path.push("ncontrol+");
+    let dir_path = dirs::document_dir()
+        .expect("could not find the Document directory")
+        .join("ncontrol+");
 
     create_dir_all(&dir_path)?;
 
@@ -39,14 +37,10 @@ pub fn save_config(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn load_config() -> Config {
-    let home_dir = dirs::home_dir().expect("Could not find the home directory");
-
-    let mut dir_path = home_dir;
-    dir_path.push("Documents");
-    dir_path.push("ncontrol+");
-
-    let mut file_path = dir_path.clone();
-    file_path.push(CONFIG_FILE);
+    let file_path = dirs::document_dir()
+        .expect("Could not find the Document directory")
+        .join("ncontrol+")
+        .join(CONFIG_FILE);
 
     if Path::new(&file_path).exists() {
         let contents = read_to_string(file_path).unwrap();
